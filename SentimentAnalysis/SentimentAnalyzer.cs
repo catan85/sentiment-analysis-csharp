@@ -59,11 +59,11 @@ namespace SentimentAnalysis
         private void InitializeDictionaries()
         {
 
-            positiveDictionary = System.IO.File.ReadAllLines("positive.txt");
+            positiveDictionary = System.IO.File.ReadAllLines(Constants.POSITIVE_FILE);
 
-            negativeDictionary = System.IO.File.ReadAllLines("negative.txt");
+            negativeDictionary = System.IO.File.ReadAllLines(Constants.NEGATIVE_FILE);
             
-            ignoreDictionary = System.IO.File.ReadAllLines("ignore.txt");
+            ignoreDictionary = System.IO.File.ReadAllLines(Constants.IGNORE_FILE);
  
         }
 
@@ -95,8 +95,11 @@ namespace SentimentAnalysis
                     }
                 }
 
-                if (Math.Abs(correspondingChars - input.Length) < Math.Abs(bestWordCorrespondingChars - input.Length))
-                //if (correspondingChars > bestWordCorrespondingChars)
+                // Il 70% della lunghezza della parola trovata deve essere più corto della parola cercata
+                // se trovo una stringa molto lunga che inizia con una corrispondenza esatta (o quasi) va ignorata perchè la
+                // parte successiva potrebbe cambiare significato alla parola
+                if (correspondingChars > bestWordCorrespondingChars &&
+                    (word.Length * 0.7) < input.Length)
                 {
                     bestWordCorrespondingChars = correspondingChars;
                     bestWord = word;
@@ -108,9 +111,8 @@ namespace SentimentAnalysis
                     break;
                 }
             }
-            
-            if ((bestWordCorrespondingChars >= input.Length * 0.7) &&   // Spostare questo controllo sulla determinazione della miglior corrispondenza!
-                ((bestWord.Length * 0.7 ) <= input.Length))
+            // la corrispondenza trovata deve avere almeno il 70% dei caratteri della parola cercata
+            if ((bestWordCorrespondingChars >= input.Length * 0.7)) 
             {
                 return new WordRate()
                 {

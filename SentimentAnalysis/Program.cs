@@ -11,7 +11,8 @@ namespace SentimentAnalysis
 {
     class Program
     {
-        static List<string> wordList = new List<string>();
+
+
         static void Main(string[] args)
         {
             string acquisitionType = "";
@@ -29,165 +30,219 @@ namespace SentimentAnalysis
 
             // ------------------------------------------------------------------------------------------------------------
             // 
-            // Analisi delle parole
+            // Analisi delle parole manuale
             // 
             // ------------------------------------------------------------------------------------------------------------
             if (manualInput)
             {
-                while (true)
-                {
-                    Console.WriteLine("Inserire una frase");
-
-                    string sentence = Console.ReadLine();
-
-                    int sentenceValue = EvaluateSentence(sentence, false);
-                    if (sentenceValue != 99999)
-                    {
-                        Console.WriteLine("Valutazione: " + sentenceValue.ToString());
-                    }
-                    
-                
-                }
+                ManualInputAnalysis();
             }
-
+            
+            // ------------------------------------------------------------------------------------------------------------
+            // 
+            // Analisi dei tweet
+            // 
+            // ------------------------------------------------------------------------------------------------------------
             if (twitterInput)
             {
-                while (true)
-                {
-                    Console.WriteLine("Inserire il termine da cercare");
-
-                    string searchString = Console.ReadLine();
-
-                    // ------------------------------------------------------------------------------------------------------------
-                    // 
-                    // Parte che preleva dati da twitter se serve..
-                    // 
-                    // ------------------------------------------------------------------------------------------------------------
-                    // GENERATE DA base64 partendo da: q5JfavTk8AIP26ccqClibgl6v:xCX3eIifQQCocceviML4TEoSDRndANbXSewXXp5gtjo92M9QO1
-                    string credentials = "cTVKZmF2VGs4QUlQMjZjY3FDbGliZ2w2djp4Q1gzZUlpZlFRQ29jY2V2aU1MNFRFb1NEUm5kQU5iWFNld1hYcDVndGpvOTJNOVFPMQ==";
-                    Twitter t = new Twitter();
-                    t.Authorize(credentials);
-                    // filtra i retweet, filtra solo roba positiva, cerca "politica"
-                    //t.Request("https://api.twitter.com/1.1/search/tweets.json?q=politica%20:)%20-filter:retweets&count=50&lang=it", "response.txt"); // result_type=popular&
-                    string textResponse = t.Request(string.Format("https://api.twitter.com/1.1/search/tweets.json?q={0}-filter:retweets&count=50&lang=it",searchString), "response.txt"); // result_type=popular&
-                    dynamic responseObj = JsonConvert.DeserializeObject<dynamic>(textResponse);
-
-                    double average = 0;
-                    int counter = 0;
-                    foreach (dynamic status in responseObj.statuses)
-                    {
-                        Console.WriteLine(status.text);
-                        string messageText = status.text;
-                        int evaluation = EvaluateSentence(messageText, true);
-                        Console.WriteLine("VALUTAZIONE FRASE: " + evaluation.ToString());
-                        average += evaluation;
-                        counter++;
-                    }
-
-                    average = average / counter;
-                    Console.WriteLine("VALUTAZIONE MEDIA: " + average.ToString());
-
-                    Console.ReadLine();
-
-                }
-
-
+                TwitterAnalysis();
             }
 
         }
 
-        static int EvaluateSentence(string sentence, bool silent)
+       
+        static void ManualInputAnalysis()
         {
-            if (!(sentence.StartsWith("[[") && sentence.EndsWith("]]") && sentence.Contains("=") &&
-                (sentence.Contains("+") || sentence.Contains("-") || sentence.Contains("i"))))
+            while (true)
             {
-                wordList.Clear();
-                string[] words = sentence.Split(new char[] { ' ', ',', '\'', '.', ';' });
-                SentimentAnalyzer sentiment = new SentimentAnalyzer();
-                int sentenceRating = 0;
-                bool negationFound = false;
+                Console.WriteLine("Inserire una frase da valutare o aggiornare i dizionari \"parola==>[0/+/-]\"");
 
-                foreach (string word in words)
-                {
-                    if (word != "")
-                    {
-                        WordRate val = sentiment.Evaluate(word);
+                string sentence = Console.ReadLine();
 
-                        if (!(val is NegationWord))
-                        {
-                            int wordValue = 0;
-                            if (val is PositiveWord)
-                            {
-                                if (!silent)
-                                {
-                                    Console.Write("[+] ");
-                                }
-                                wordValue = val.Rating;
-                            }
-                            if (val is NegativeWord)
-                            {
-                                if (!silent)
-                                {
-                                    Console.Write("[-] ");
-                                }
-                                wordValue = 0 - val.Rating;
-                            }
-                            if (val is IgnoreWord)
-                            {
-                                if (!silent)
-                                {
-                                    Console.Write("[i] ");
-                                }
-                                wordValue = 0;
-                            }
-                            if (!silent)
-                            {
-                                Console.WriteLine(wordList.Count.ToString() + " > " + word + "\t" + val.Word + "\t" + wordValue.ToString());
-                            }
-                            wordList.Add(word);
-                            sentenceRating += wordValue;
-                        }
+                CheckInput(sentence, false);
+      
+            }
+        }
 
-                        else
-                        {
-                            negationFound = true;
-                        }
-                    }
-                }
-                if (negationFound) { sentenceRating = 0 - sentenceRating; }
 
-                return sentenceRating;
+        static void CheckInput(string input, bool silent)
+        {
+            bool editVocabulary = input.Contains("==>");
+
+            if (!editVocabulary)
+            {
+                int inputEvaluation =  EvaluateSentence(input, silent);
+                Console.WriteLine("Input evaluation: " + inputEvaluation.ToString());
             }
             else
             {
-                try
-                {
-                    // Se inizia per [[ e finisce per ]]
-                    sentence = sentence.Replace("[[", "");
-                    sentence = sentence.Replace("]]", "");
-                    int index = int.Parse(sentence.Split('=')[0]);
-                    string listType = sentence.Split('=')[1];
+                ChangeVocabulary(input);
+            }
+        }
 
-                    if (listType == "i")
+        private static int EvaluateSentence(string sentence, bool silent)
+        {
+            string[] words = sentence.Split(new char[] { ' ', ',', '\'', '.', ';' , '\"'});
+            SentimentAnalyzer sentiment = new SentimentAnalyzer();
+            int sentenceRating = 0;
+            bool negationFound = false;
+
+            foreach (string word in words)
+            {
+                if (word != "")
+                {
+                    WordRate val = sentiment.Evaluate(word);
+
+                    if (!(val is NegationWord))
                     {
-                        System.IO.File.AppendAllLines("ignore.txt", new string[] { wordList[index] });
+                        int wordValue = 0;
+                        string meaning = "";
+                        if (val is PositiveWord)
+                        {
+                            meaning = "[+]";
+                            wordValue = val.Rating;
+                        }
+                        if (val is NegativeWord)
+                        {
+                            meaning = "[-]";
+                            wordValue = 0 - val.Rating;
+                        }
+                        if (val is IgnoreWord)
+                        {
+                            meaning = "[0]";
+                            wordValue = 0;
+                        }
+                        if (!silent)
+                        {
+                            Console.WriteLine(meaning + " " + word + "\t" + val.Word + "\t" + wordValue.ToString());
+                        }
+                        sentenceRating += wordValue;
                     }
-                    else if (listType == "+")
+
+                    else
                     {
-                        System.IO.File.AppendAllLines("positive.txt", new string[] { wordList[index] });
+                        negationFound = true;
                     }
-                    else if (listType == "-")
-                    {
-                        System.IO.File.AppendAllLines("negative.txt", new string[] { wordList[index] });
-                    }
+                }
+            }
+            if (negationFound) { sentenceRating = 0 - sentenceRating; }
+            return sentenceRating;
+        }
+
+        private static void ChangeVocabulary(string input)
+        {
+            try
+            {
+                string word = input.Split(new string[] { "==>" }, StringSplitOptions.None)[0];
+                string meaning = input.Split(new string[] { "==>" }, StringSplitOptions.None)[1];
+
+                if (meaning == "0")
+                {
+                    AddToVocabulary(word, Constants.IGNORE_FILE);
+                    DeleteFromVocabulary(word, Constants.POSITIVE_FILE);
+                    DeleteFromVocabulary(word, Constants.NEGATIVE_FILE);
                     Console.WriteLine("Dizionari aggiornati");
                 }
-                catch (Exception ex)
+                else if (meaning == "+")
                 {
-                    Console.WriteLine("Selezione non riconosciuta..");
+                    AddToVocabulary(word, Constants.POSITIVE_FILE);
+                    DeleteFromVocabulary(word, Constants.IGNORE_FILE);
+                    DeleteFromVocabulary(word, Constants.NEGATIVE_FILE);
+                    Console.WriteLine("Dizionari aggiornati");
+                }
+                else if (meaning == "-")
+                {
+                    AddToVocabulary(word, Constants.NEGATIVE_FILE);
+                    DeleteFromVocabulary(word, Constants.IGNORE_FILE);
+                    DeleteFromVocabulary(word, Constants.POSITIVE_FILE);
+                    Console.WriteLine("Dizionari aggiornati");
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Selezione non riconosciuta..");
+            }
+        }
+
+        private static void AddToVocabulary(string word, string filename)
+        {
+            StreamReader reader = new StreamReader(filename);
+            StreamWriter writer = new StreamWriter(filename + ".tmp");
+
+            writer.WriteLine(word);
+
+            while (!reader.EndOfStream)
+            {
+                string line = reader.ReadLine();
+                if (line != word)
+                {
+                    writer.WriteLine(line);
+                }
+            }
+            reader.Close();
+            writer.Close();
+            File.Delete(filename);
+            File.Move(filename + ".tmp", filename);
+        }
+
+        private static void DeleteFromVocabulary(string word, string filename)
+        {
+            StreamReader reader = new StreamReader(filename);
+            StreamWriter writer = new StreamWriter(filename +".tmp");
+            while(!reader.EndOfStream)
+            {
+                string line = reader.ReadLine();
+                if (line != word)
+                {
+                    writer.WriteLine(line);
+                }
+            }
+            reader.Close();
+            writer.Close();
+            File.Delete(filename);
+            File.Move( filename + ".tmp", filename);
+        }
+
+        private static void TwitterAnalysis()
+        {
+            while (true)
+            {
+                Console.WriteLine("Inserire il termine da cercare");
+
+                string searchString = Console.ReadLine();
+
+                // ------------------------------------------------------------------------------------------------------------
+                // 
+                // Parte che preleva dati da twitter se serve..
+                // 
+                // ------------------------------------------------------------------------------------------------------------
+                // GENERATE DA base64 partendo da: q5JfavTk8AIP26ccqClibgl6v:xCX3eIifQQCocceviML4TEoSDRndANbXSewXXp5gtjo92M9QO1
+                string credentials = "cTVKZmF2VGs4QUlQMjZjY3FDbGliZ2w2djp4Q1gzZUlpZlFRQ29jY2V2aU1MNFRFb1NEUm5kQU5iWFNld1hYcDVndGpvOTJNOVFPMQ==";
+                Twitter t = new Twitter();
+                t.Authorize(credentials);
+                // filtra i retweet, filtra solo roba positiva, cerca "politica"
+                //t.Request("https://api.twitter.com/1.1/search/tweets.json?q=politica%20:)%20-filter:retweets&count=50&lang=it", "response.txt"); // result_type=popular&
+                string textResponse = t.Request(string.Format("https://api.twitter.com/1.1/search/tweets.json?q={0}-filter:retweets&count=50&lang=it", searchString), "response.txt"); // result_type=popular&
+                dynamic responseObj = JsonConvert.DeserializeObject<dynamic>(textResponse);
+
+                double average = 0;
+                int counter = 0;
+                foreach (dynamic status in responseObj.statuses)
+                {
+                    Console.WriteLine(status.text);
+                    string messageText = status.text;
+                    int evaluation = EvaluateSentence(messageText, true);
+                    Console.WriteLine("VALUTAZIONE FRASE: " + evaluation.ToString());
+                    average += evaluation;
+                    counter++;
                 }
 
-                return 0;
+                average = average / counter;
+                Console.WriteLine("VALUTAZIONE MEDIA: " + average.ToString());
+
+                Console.ReadLine();
+
             }
         }
     }
