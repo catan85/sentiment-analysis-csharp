@@ -1,0 +1,12 @@
+Distanza di Levenshtein per calcolare la distanza tra due stringhe
+
+
+Le parole positive e negative le ho ricavate da:
+http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html
+
+
+
+
+Le parole neutrali pure era difficile trovarle, le ho ricavate dal lexicon di questo progetto
+http://valeriobasile.github.io/twita/
+filtrando quelle che avevano un range di intensità tra -0,2 e +0,2 (indipendentemente dalla polarità)
